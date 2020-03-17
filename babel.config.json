@@ -1,0 +1,18 @@
+{
+    "presets": [
+      [
+        "@babel/env",
+        {
+          "targets": {
+            "browsers": [
+              "last 2 Chrome version",
+              "last 2 Firefox version",
+              "last 2 Safari version"
+            ]
+          },
+          "corejs": "2.0.0",
+          "useBuiltIns": "usage"
+        }
+      ]
+    ]
+  }
