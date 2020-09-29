@@ -2,6 +2,10 @@
  * @file Wrapper around the basic functions offered by the Public API
  * @see https://app.picterra.ch/public/apidocs/v1/
  */
+const {createReadStream, createWriteStream} = require('fs')
+const util = require('util')
+const streamPipeline = util.promisify(require('stream').pipeline)
+
 /**
  * Sleep for a given amount of seconds
  * @param {Number} s Seconds to wait
@@ -111,19 +115,15 @@ export default class APIClient {
   /**
      * @async
      * @function uploadRaster
-     * @summary Given a raster, upload and commit it
-     * @description The workflow is the following
-     *  - we request an upload URL
-     *  - we send raster data stream to the above URL
-     *  - once finished, we order the server to commit (process) the raster
-     *  - we poll the status of the processing until completion
-     * @param {*} fileData
-     * @param {Number} fileSize
+     * @summary Uploads a local file as a new raster on Picterra
+     * @param {Number} fileName name of the local file to upload
      * @param {String} rasterName Name
-     * @returns {Boolean} If the upload succedeed
+     * @returns {Promise} A promise that resolves to the rasterId (String)
+     *   once the raster is ready on Picterra
      * @throws {APIError} Containing error code and text
      */
-  async uploadRaster (fileData, fileSize, rasterName) {
+  async uploadRaster (fileName, rasterName) {
+    const stream = createReadStream(fileName)
     let response, data
     try {
       response = await this._request( // Get upload URL
@@ -142,7 +142,7 @@ export default class APIClient {
       const uploadUrl = data.upload_url // e.g. "https://storage.picterra.ch?id=AEnB2UmSEvVl"
       const rasterId = data.raster_id // e.g. "123e4567-e89b-12d3-a456-426655440000"
       // Send raster data to blobstore
-      response = await this._request(uploadUrl, 'PUT', { 'content-length': fileSize }, fileData, false)
+      response = await this._request(uploadUrl, 'PUT', {}, stream, false)
       if (!response.ok) {
         throw new APIError(`Error uploading raster with code ${response.status}`)
       }
@@ -165,14 +165,13 @@ export default class APIClient {
         }
         data = await response.json()
         isReady = (data.status === 'ready')
-      }
-      while (!isReady) // Poll until complete
+      } while (!isReady) // Poll until complete
       // Raise error in case of timeout or bad response
       if (!isReady) {
         const errorMessage = response.ok ? 'Request timed-out' : 'Error uploading raster'
         throw new APIError(errorMessage)
       }
-      return true
+      return rasterId
     } catch (error) {
       throw new APIError(error)
     }
@@ -289,7 +288,7 @@ export default class APIClient {
      * @returns {Promise<String>} Promise for the URL where the detection results are stored
      * @throws {APIError} Containing error code and text
      */
-  async runDetectorOnRaster (detectorId, rasterId) {
+  async runDetector (detectorId, rasterId) {
     let response, data, isReady
     if (!uuidValidator(detectorId)) {
       throw new ValidationError('Invalid UUID string for a custom detector')
@@ -312,7 +311,7 @@ export default class APIClient {
       data = await response.json()
       const pollInterval = data.poll_interval
       const timeout = Date.now() + this._timeout
-      const resultId = data.result_id // e.g. "123e4567-e89b-12d3-a456-426655440000"
+      const resultId = data.result_id
       isReady = false
       // Start polling to check detection status
       do {
@@ -330,10 +329,26 @@ export default class APIClient {
         const errorMessage = response.ok ? 'Request timed-out' : 'Error detecting on raster'
         throw new APIError(errorMessage)
       }
-      // Returns the URL from which we can download the GeoJSON with the resulting geometries
-      return data.result_url
+      return resultId
     } catch (error) {
       throw new APIError(error)
     }
+  }
+
+  async downloadResultToFile (resultId, fileName) {
+    let response = await this._request(`/results/${resultId}/`)
+    if (!response.ok) {
+      throw new APIError(`Error launching detection with status ${response.status}`)
+    }
+    const data = await response.json()
+    if (!data.ready) {
+      throw new APIError('Result not ready')
+    }
+
+    response = await this._request(data.result_url, 'GET', {}, null, false)
+    if (!response.ok) {
+      throw new APIError(`unexpected response ${response.statusText}`)
+    }
+    return streamPipeline(response.body, createWriteStream(fileName))
   }
 }

@@ -3,7 +3,7 @@ const nock = require('nock')  // // https://github.com/nock/nock
 const assert = require('assert').strict  // https://nodejs.org/api/assert.html
 const tmp = require('tmp')
 
-const APIClient = require("../dist/index.js").default
+const APIClient = require("../dist/index.js").APIClient
 
 // CONSTANTS
 const TEST_API_URL = 'http://example.com/public/api/v1'
@@ -58,7 +58,7 @@ describe('/detectors/ endpoint', async () => {
         assert.ok(res)
     })
     it('Should run one detector', async () => {
-        const res = await this.mockClient.runDetectorOnRaster(DETECTOR_ID, RASTER_ID)
+        const res = await this.mockClient.runDetector(DETECTOR_ID, RASTER_ID)
         assert.ok(res)
     })
 })
