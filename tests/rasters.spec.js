@@ -3,7 +3,7 @@ const nock = require('nock')  // // https://github.com/nock/nock
 const assert = require('assert').strict  // https://nodejs.org/api/assert.html
 const tmp = require('tmp')
 
-const APIClient = require("../dist/index.js").default
+const APIClient = require("../dist/index.js").APIClient
 
 // CONSTANTS
 const TEST_API_URL = 'http://example.com/public/api/v1'
@@ -65,7 +65,7 @@ describe('/rasters/ endpoints', async () => {
     it('Should upload a raster', async () => {
         // Create fake image file
         this.tmp = tmp.fileSync()
-        const res = await this.mockClient.uploadRaster(this.tmp, 0, RASTER_NAME)
+        const res = await this.mockClient.uploadRaster(this.tmp.name, RASTER_NAME)
         assert.ok(res)
     })
     it('Should get the list of rasters', async () => {
