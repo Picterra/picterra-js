@@ -75,7 +75,7 @@ export default class APIClient {
      * @param {Boolean} internal Whether or not the path URI refers to an endpoint
      * relative to the root API one
      */
-  _request (path, method = 'GET', headers = {}, body = null, internal = true) {
+  async _request (path, method = 'GET', headers = {}, body = null, internal = true) {
     const fetchHeaders = new this._headers({})
     let response
     if (internal) {
@@ -89,14 +89,10 @@ export default class APIClient {
       headers: fetchHeaders,
       body: body
     }
-    try {
-      response = this._fetch(
-        internal ? (this.baseUrl + path) : path,
-        fetchOptions
-      )
-    } catch (e) {
-      throw new Error('Error in Fetch API :' + e)
-    }
+    response = await this._fetch(
+      internal ? (this.baseUrl + path) : path,
+      fetchOptions
+    )
     return response
   }
   /**
@@ -112,56 +108,52 @@ export default class APIClient {
   async uploadRaster (fileName, rasterName) {
     const stream = createReadStream(fileName)
     let response, data
-    try {
-      response = await this._request( // Get upload URL
-        '/rasters/upload/file/',
-        'POST',
-        {'content-type': 'application/json'},
-        JSON.stringify({
-          'name': rasterName // name of the image to upload
-        })
-      )
-      if (!response.ok) {
-        throw new APIError(`Error getting raster upload URL, status code ${response.status}`)
-      }
-      // Get parameters for blobstore upload
-      data = await response.json()
-      const uploadUrl = data.upload_url // e.g. "https://storage.picterra.ch?id=AEnB2UmSEvVl"
-      const rasterId = data.raster_id // e.g. "123e4567-e89b-12d3-a456-426655440000"
-      // Send raster data to blobstore
-      response = await this._request(uploadUrl, 'PUT', {}, stream, false)
-      if (!response.ok) {
-        throw new APIError(`Error uploading raster with code ${response.status}`)
-      }
-      // Commit uploaded raster
-      response = await this._request(`/rasters/${rasterId}/commit/`, 'POST')
-      if (!response.ok) {
-        throw new APIError(`Error committing raster ${response.status}`)
-      }
-      data = await response.json()
-      // Prepare for polling
-      const pollInterval = data.poll_interval // In seconds
-      const timeout = Date.now() + this._timeout
-      let isReady = false
-      // Start polling to check raster commit status
-      do {
-        await sleep(pollInterval)
-        response = await this._request(`/rasters/${rasterId}/`)
-        if ((Date.now() > timeout) || !response.ok) {
-          break
-        }
-        data = await response.json()
-        isReady = (data.status === 'ready')
-      } while (!isReady) // Poll until complete
-      // Raise error in case of timeout or bad response
-      if (!isReady) {
-        const errorMessage = response.ok ? 'Request timed-out' : 'Error uploading raster'
-        throw new APIError(errorMessage)
-      }
-      return rasterId
-    } catch (error) {
-      throw new APIError(error)
+    response = await this._request( // Get upload URL
+      '/rasters/upload/file/',
+      'POST',
+      {'content-type': 'application/json'},
+      JSON.stringify({
+        'name': rasterName // name of the image to upload
+      })
+    )
+    if (!response.ok) {
+      throw new APIError(`Error getting raster upload URL, status code ${response.status}`)
     }
+    // Get parameters for blobstore upload
+    data = await response.json()
+    const uploadUrl = data.upload_url // e.g. "https://storage.picterra.ch?id=AEnB2UmSEvVl"
+    const rasterId = data.raster_id // e.g. "123e4567-e89b-12d3-a456-426655440000"
+    // Send raster data to blobstore
+    response = await this._request(uploadUrl, 'PUT', {}, stream, false)
+    if (!response.ok) {
+      throw new APIError(`Error uploading raster with code ${response.status}`)
+    }
+    // Commit uploaded raster
+    response = await this._request(`/rasters/${rasterId}/commit/`, 'POST')
+    if (!response.ok) {
+      throw new APIError(`Error committing raster ${response.status}`)
+    }
+    data = await response.json()
+    // Prepare for polling
+    const pollInterval = data.poll_interval // In seconds
+    const timeout = Date.now() + this._timeout
+    let isReady = false
+    // Start polling to check raster commit status
+    do {
+      await sleep(pollInterval)
+      response = await this._request(`/rasters/${rasterId}/`)
+      if ((Date.now() > timeout) || !response.ok) {
+        break
+      }
+      data = await response.json()
+      isReady = (data.status === 'ready')
+    } while (!isReady) // Poll until complete
+    // Raise error in case of timeout or bad response
+    if (!isReady) {
+      const errorMessage = response.ok ? 'Request timed-out' : 'Error uploading raster'
+      throw new APIError(errorMessage)
+    }
+    return rasterId
   }
   /**
      * @async
@@ -173,19 +165,15 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async listRasters () {
-    try {
-      const response = await this._request('/rasters/')
-      if (!response.ok) {
-        throw new APIError(response, `Error getting rasters list with status ${response.status}`)
-      }
-      const data = await response.json()
-      if (!Array.isArray(data)) {
-        throw new APIError('Not getting a list as response')
-      }
-      return data
-    } catch (error) {
-      throw new APIError(error)
+    const response = await this._request('/rasters/')
+    if (!response.ok) {
+      throw new APIError(response, `Error getting rasters list with status ${response.status}`)
     }
+    const data = await response.json()
+    if (!Array.isArray(data)) {
+      throw new APIError('Not getting a list as response')
+    }
+    return data
   }
   /**
      * @async
@@ -199,16 +187,12 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async getRasterById (rasterId) {
-    try {
-      const response = await this._request(`/rasters/${rasterId}/`)
-      if (!response.ok) {
-        throw new APIError(`Error getting raster metadata with status ${response.status}`)
-      }
-      const data = await response.json()
-      return data
-    } catch (error) {
-      throw new APIError(error)
+    const response = await this._request(`/rasters/${rasterId}/`)
+    if (!response.ok) {
+      throw new APIError(`Error getting raster metadata with status ${response.status}`)
     }
+    const data = await response.json()
+    return data
   }
   /**
      * @async
@@ -220,19 +204,15 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async listDetectors () {
-    try {
-      const response = await this._request('/detectors/')
-      if (!response.ok) {
-        throw new APIError(`Error getting detectors list with status ${response.status}`)
-      }
-      const data = await response.json()
-      if (!Array.isArray(data)) {
-        throw new APIError('Not getting a list as response')
-      }
-      return data
-    } catch (error) {
-      throw new APIError(error)
+    const response = await this._request('/detectors/')
+    if (!response.ok) {
+      throw new APIError(`Error getting detectors list with status ${response.status}`)
     }
+    const data = await response.json()
+    if (!Array.isArray(data)) {
+      throw new APIError('Not getting a list as response')
+    }
+    return data
   }
   /**
      * @async
@@ -246,16 +226,12 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async getDetectorById (detectorId) {
-    try {
-      const response = await this._request(`/detectors/${detectorId}/`)
-      if (!response.ok) {
-        throw new APIError(`Error getting detector metadata with status ${response.status}`)
-      }
-      const data = await response.json()
-      return data
-    } catch (error) {
-      throw new APIError(error)
+    const response = await this._request(`/detectors/${detectorId}/`)
+    if (!response.ok) {
+      throw new APIError(`Error getting detector metadata with status ${response.status}`)
     }
+    const data = await response.json()
+    return data
   }
   /**
      * @async
@@ -271,43 +247,39 @@ export default class APIClient {
      */
   async runDetector (detectorId, rasterId) {
     let response, data, isReady
-    try {
-      response = await this._request(
-        `/detectors/${detectorId}/run/`,
-        'POST',
-        {'content-type': 'application/json'},
-        JSON.stringify({
-          'raster_id': rasterId
-        })
-      )
-      if (!response.ok) {
-        throw new APIError(`Error launching detection with status ${response.status}`)
+    response = await this._request(
+      `/detectors/${detectorId}/run/`,
+      'POST',
+      {'content-type': 'application/json'},
+      JSON.stringify({
+        'raster_id': rasterId
+      })
+    )
+    if (!response.ok) {
+      throw new APIError(`Error launching detection with status ${response.status}`)
+    }
+    data = await response.json()
+    const pollInterval = data.poll_interval
+    const timeout = Date.now() + this._timeout
+    const resultId = data.result_id
+    isReady = false
+    // Start polling to check detection status
+    do {
+      await sleep(pollInterval)
+      response = await this._request(`/results/${resultId}/`)
+      if ((Date.now() > timeout) || !response.ok) {
+        break
       }
       data = await response.json()
-      const pollInterval = data.poll_interval
-      const timeout = Date.now() + this._timeout
-      const resultId = data.result_id
-      isReady = false
-      // Start polling to check detection status
-      do {
-        await sleep(pollInterval)
-        response = await this._request(`/results/${resultId}/`)
-        if ((Date.now() > timeout) || !response.ok) {
-          break
-        }
-        data = await response.json()
-        isReady = data.ready
-      }
-      while (!isReady) // Poll until complete
-      // Raise error in case of timeout or bad response
-      if (!isReady) {
-        const errorMessage = response.ok ? 'Request timed-out' : 'Error detecting on raster'
-        throw new APIError(errorMessage)
-      }
-      return resultId
-    } catch (error) {
-      throw new APIError(error)
+      isReady = data.ready
     }
+    while (!isReady) // Poll until complete
+    // Raise error in case of timeout or bad response
+    if (!isReady) {
+      const errorMessage = response.ok ? 'Request timed-out' : 'Error detecting on raster'
+      throw new APIError(errorMessage)
+    }
+    return resultId
   }
 
   async downloadResultToFile (resultId, fileName) {
