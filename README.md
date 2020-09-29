@@ -6,4 +6,4 @@
 
 # Picterra JavaScript API Client
 
-[![Build](https://travis-ci.org/Picterra/picterra-javascript.svg?branch=master)](https://travis-ci.org/Picterra/picterra-javascript.svg?branch=master)
+![lint and test](https://github.com/Picterra/picterra-js/workflows/lint%20and%20test/badge.svg?branch=master)
