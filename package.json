@@ -1,5 +1,5 @@
 {
-  "name": "picterra-javascript",
+  "name": "picterra",
   "version": "0.0.1",
   "description": "Picterra JavaScript API Client",
   "main": "dist/index.js",
