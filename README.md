@@ -7,3 +7,6 @@
 # Picterra JavaScript API Client
 
 ![lint and test](https://github.com/Picterra/picterra-js/workflows/lint%20and%20test/badge.svg?branch=master)
+
+
+**Please note that currently this library works only on Node, not yet portable to browser.**
