@@ -16,9 +16,10 @@ const sleep = s => new Promise(resolve => setTimeout(resolve, s * 1000))
  * Errors returned by the APi server
  */
 export class APIError extends Error {
-  constructor (message) {
+  constructor (message, body = '') {
     super(message)
     this.name = 'ApiError'
+    this.body = body
   }
 }
 /**
@@ -193,6 +194,67 @@ export default class APIClient {
     }
     const data = await response.json()
     return data
+  }
+  /**
+     * @async
+     * @summary Set the detection area of an available raster
+     * @description Given a raster, sets the detection area geometries for it, overriding
+     * any previous one
+     * @param {String} rasterId The Id of the raster whose detection area we want to set
+     * @param {String} fileName The GeoJSON with the Detection Areas geometries
+     * @returns {Promise<Boolean>} Whether or not the operation succedeed
+     * @throws {APIError} Containing error code and text
+     * @example TODO
+     */
+  async setRasterDetectionAreaFromFile (fileName, rasterId) {
+    const stream = createReadStream(fileName)
+    let response, data
+    // Get upload URL
+    response = await this._request(`/rasters/${rasterId}/detection_areas/upload/file/`, 'POST')
+    if (!response.ok) {
+      const text = await response.text()
+      throw new APIError(`Error getting detection area upload url with status ${response.status}`, text)
+    }
+    data = await response.json()
+    const uploadUrl = data.upload_url
+    const uploadId = data.upload_id
+    // Send geojson data to blobstore
+    response = await this._request(uploadUrl, 'PUT', {}, stream, false)
+    if (!response.ok) {
+      throw new APIError(`Error uploading with code ${response.status}`, data)
+    }
+    // Commit the upload
+    response = await this._request(`/rasters/${rasterId}/detection_areas/upload/${uploadId}/commit/`, 'POST')
+    if (!response.ok) {
+      const text = await response.text()
+      throw new APIError(`Error committing detection area (${response.status}):`, text)
+    }
+    // Prepare for polling
+    data = await response.json()
+    const pollInterval = data.poll_interval // In seconds
+    const timeout = Date.now() + this._timeout
+    let isReady = false
+    // Start polling to check upload commit status
+    do {
+      await sleep(pollInterval)
+      response = await this._request(`/rasters/${rasterId}/detection_areas/upload/${uploadId}/`)
+      if ((Date.now() > timeout) || !response.ok) {
+        break
+      }
+      data = await response.json()
+      if (data.status === 'failed') {
+        break
+      }
+      isReady = (data.status === 'ready')
+    }
+    while (!isReady) // Poll until complete
+    // Error management
+    if (!isReady) {
+      const text = await response.text()
+      throw new APIError('Error uploading detection area', text)
+    } else {
+      return true
+    }
   }
   /**
      * @async
