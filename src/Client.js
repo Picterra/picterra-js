@@ -12,30 +12,22 @@ const streamPipeline = util.promisify(require('stream').pipeline)
  */
 const sleep = s => new Promise(resolve => setTimeout(resolve, s * 1000))
 /**
- * Validates an UUID
- * @param {String} uuid String to validate
- */
-const uuidValidator = uuid => {
-  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-  return regex.test(uuid)
-}
-/**
- * Validation errors when calling library functions
- */
-class ValidationError extends Error {
-  constructor(message) {
-    super(message)
-    this.name = 'Validation Error'
-  }
-}
-/**
- * Errors returned by the APi server
+ * Errors returned by the API server
  */
 export class APIError extends Error {
   constructor (message, body = '') {
     super(message)
     this.name = 'ApiError'
     this.body = body
+  }
+}
+/**
+ * Check the response returned a successful HTTP code, otherwise raise APIError
+ */
+async function checkResponse (response) {
+  if (!response.ok) {
+    const text = await response.text()
+    throw new APIError(`Error from API: status code ${response.status}`, text)
   }
 }
 /**
@@ -133,23 +125,16 @@ export default class APIClient {
         'name': rasterName // name of the image to upload
       })
     )
-    if (!response.ok) {
-      throw new APIError(`Error getting raster upload URL, status code ${response.status}`)
-    }
     // Get parameters for blobstore upload
     data = await response.json()
     const uploadUrl = data.upload_url // e.g. "https://storage.picterra.ch?id=AEnB2UmSEvVl"
     const rasterId = data.raster_id // e.g. "123e4567-e89b-12d3-a456-426655440000"
     // Send raster data to blobstore
     response = await this._request(uploadUrl, 'PUT', {}, stream, false)
-    if (!response.ok) {
-      throw new APIError(`Error uploading raster with code ${response.status}`)
-    }
+    await checkResponse(response)
     // Commit uploaded raster
     response = await this._request(`/rasters/${rasterId}/commit/`, 'POST')
-    if (!response.ok) {
-      throw new APIError(`Error committing raster ${response.status}`)
-    }
+    await checkResponse(response)
     data = await response.json()
     // Prepare for polling
     const pollInterval = data.poll_interval // In seconds
@@ -183,9 +168,7 @@ export default class APIClient {
      */
   async listRasters () {
     const response = await this._request('/rasters/')
-    if (!response.ok) {
-      throw new APIError(response, `Error getting rasters list with status ${response.status}`)
-    }
+    await checkResponse(response)
     const data = await response.json()
     if (!Array.isArray(data)) {
       throw new APIError('Not getting a list as response')
@@ -204,13 +187,8 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async getRasterById (rasterId) {
-    if (!uuidValidator(rasterId)) {
-        throw new ValidationError('Invalid UUID string ', rasterId)
-    }
     const response = await this._request(`/rasters/${rasterId}/`)
-    if (!response.ok) {
-      throw new APIError(`Error getting raster metadata with status ${response.status}`)
-    }
+    await checkResponse(response)
     const data = await response.json()
     return data
   }
@@ -223,31 +201,22 @@ export default class APIClient {
      * @param {String} fileName The GeoJSON with the Detection Areas geometries
      * @returns {Promise<Boolean>} Whether or not the operation succedeed
      * @throws {APIError} Containing error code and text
-     * @example TODO
      */
   async setRasterDetectionAreaFromFile (fileName, rasterId) {
     const stream = createReadStream(fileName)
     let response, data
     // Get upload URL
     response = await this._request(`/rasters/${rasterId}/detection_areas/upload/file/`, 'POST')
-    if (!response.ok) {
-      const text = await response.text()
-      throw new APIError(`Error getting detection area upload url with status ${response.status}`, text)
-    }
+    await checkResponse(response)
     data = await response.json()
     const uploadUrl = data.upload_url
     const uploadId = data.upload_id
     // Send geojson data to blobstore
     response = await this._request(uploadUrl, 'PUT', {}, stream, false)
-    if (!response.ok) {
-      throw new APIError(`Error uploading with code ${response.status}`, data)
-    }
+    await checkResponse(response)
     // Commit the upload
     response = await this._request(`/rasters/${rasterId}/detection_areas/upload/${uploadId}/commit/`, 'POST')
-    if (!response.ok) {
-      const text = await response.text()
-      throw new APIError(`Error committing detection area (${response.status}):`, text)
-    }
+    await checkResponse(response)
     // Prepare for polling
     data = await response.json()
     const pollInterval = data.poll_interval // In seconds
@@ -284,16 +253,10 @@ export default class APIClient {
     * @throws {APIError} Containing error code and text
     */
   async deleteRasterById (rasterId) {
-    if (!uuidValidator(rasterId)) {
-      throw new ValidationError('Invalid UUID string: ', rasterId)
-    }
     // Send HTTP request
     const response = await this._request('/rasters/'.concat(rasterId, '/'), 'DELETE')
     // Error management
-    if (!response.ok) {
-      const text = await response.text()
-      throw new APIError('Error deleting raster with status '.concat(response.status), text)
-    }
+    await checkResponse(response)
     // Return all went good
     return true
   }
@@ -308,9 +271,7 @@ export default class APIClient {
    */
   async listDetectors () {
     const response = await this._request('/detectors/')
-    if (!response.ok) {
-      throw new APIError(`Error getting detectors list with status ${response.status}`)
-    }
+    await checkResponse(response)
     const data = await response.json()
     if (!Array.isArray(data)) {
       throw new APIError('Not getting a list as response')
@@ -329,13 +290,8 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async getDetectorById (detectorId) {
-    if (!uuidValidator(detectorId)) {
-        throw new ValidationError('Invalid UUID string ', detectorId)
-    }
     const response = await this._request(`/detectors/${detectorId}/`)
-    if (!response.ok) {
-      throw new APIError(`Error getting detector metadata with status ${response.status}`)
-    }
+    await checkResponse(response)
     const data = await response.json()
     return data
   }
@@ -361,9 +317,7 @@ export default class APIClient {
         'raster_id': rasterId
       })
     )
-    if (!response.ok) {
-      throw new APIError(`Error launching detection with status ${response.status}`)
-    }
+    await checkResponse(response)
     data = await response.json()
     const pollInterval = data.poll_interval
     const timeout = Date.now() + this._timeout
@@ -390,18 +344,14 @@ export default class APIClient {
 
   async downloadResultToFile (resultId, fileName) {
     let response = await this._request(`/results/${resultId}/`)
-    if (!response.ok) {
-      throw new APIError(`Error launching detection with status ${response.status}`)
-    }
+    await checkResponse(response)
     const data = await response.json()
     if (!data.ready) {
       throw new APIError('Result not ready')
     }
 
     response = await this._request(data.result_url, 'GET', {}, null, false)
-    if (!response.ok) {
-      throw new APIError(`unexpected response ${response.statusText}`)
-    }
+    await checkResponse(response)
     return streamPipeline(response.body, createWriteStream(fileName))
   }
 }
