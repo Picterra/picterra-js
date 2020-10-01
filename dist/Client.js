@@ -26,6 +26,28 @@ const streamPipeline = util.promisify(require('stream').pipeline);
 
 const sleep = s => new Promise(resolve => setTimeout(resolve, s * 1000));
 /**
+ * Validates an UUID
+ * @param {String} uuid String to validate
+ */
+
+
+const uuidValidator = uuid => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+};
+/**
+ * Validation errors when calling library functions
+ */
+
+
+class ValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'Validation Error';
+  }
+
+}
+/**
  * Errors returned by the APi server
  */
 
@@ -238,6 +260,10 @@ class APIClient {
 
 
   async getRasterById(rasterId) {
+    if (!uuidValidator(rasterId)) {
+      throw new ValidationError('Invalid UUID string ', rasterId);
+    }
+
     const response = await this._request(`/rasters/${rasterId}/`);
 
     if (!response.ok) {
@@ -363,6 +389,10 @@ class APIClient {
 
 
   async getDetectorById(detectorId) {
+    if (!uuidValidator(detectorId)) {
+      throw new ValidationError('Invalid UUID string ', detectorId);
+    }
+
     const response = await this._request(`/detectors/${detectorId}/`);
 
     if (!response.ok) {
