@@ -77,6 +77,11 @@ describe('/rasters/ endpoints', async () => {
         .get(`/rasters/${RASTER_ID}/`)
         .reply(200, mockRasterList.find( r => r.id == RASTER_ID))
         .log(console.log)
+    // DELETE /raster
+    scope = nock(TEST_API_URL,  {
+        reqheaders: {'X-Api-Key': TEST_API_KEY}})
+        .delete(`/rasters/${RASTER_ID}/`)
+        .reply(204)
     scope.defaultReplyHeaders({
         'content-type': 'application/json',
     })
@@ -104,6 +109,10 @@ describe('/rasters/ endpoints', async () => {
     })
     it('Should set the detection area of one raster', async () => {
         const res = await this.mockClient.setRasterDetectionAreaFromFile(FILEPATH, RASTER_ID)
+        assert.ok(res)
+    })
+    it('Should delete one raster', async () => {
+        const res = await this.mockClient.deleteRasterById(RASTER_ID)
         assert.ok(res)
     })
 })

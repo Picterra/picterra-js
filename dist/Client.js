@@ -350,14 +350,40 @@ class APIClient {
     }
   }
   /**
-     * @async
-     * @function listDetectors
-     * @summary Get the list of available custom detectors
-     * @description Lists the metadata of all the custom detectors
-     * owned by the API user, thus ready to preditc with on rasters
-     * @returns {Promise<[Object]>} A JSON list of the available detectors
-     * @throws {APIError} Containing error code and text
-     */
+    * @summary Delete a raster, identified by an UUID
+    * @description Delete a given raster, identified by an UUID and
+    * owned by the API user
+    * @param {String} rasterId UUID of the raster
+    * @returns {Promise<Boolean>} Whether or not removal was successful
+    * @throws {APIError} Containing error code and text
+    */
+
+
+  async deleteRasterById(rasterId) {
+    if (!uuidValidator(rasterId)) {
+      throw new ValidationError('Invalid UUID string: ', rasterId);
+    } // Send HTTP request
+
+
+    const response = await this._request('/rasters/'.concat(rasterId, '/'), 'DELETE'); // Error management
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new APIError('Error deleting raster with status '.concat(response.status), text);
+    } // Return all went good
+
+
+    return true;
+  }
+  /**
+   * @async
+   * @function listDetectors
+   * @summary Get the list of available custom detectors
+   * @description Lists the metadata of all the custom detectors
+   * owned by the API user, thus ready to preditc with on rasters
+   * @returns {Promise<[Object]>} A JSON list of the available detectors
+   * @throws {APIError} Containing error code and text
+   */
 
 
   async listDetectors() {
