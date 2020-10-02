@@ -39,12 +39,20 @@ class APIError extends Error {
   }
 
 }
+
+exports.APIError = APIError;
+
+class ValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'Validation Error';
+  }
+
+}
 /**
  * Check the response returned a successful HTTP code, otherwise raise APIError
  */
 
-
-exports.APIError = APIError;
 
 async function checkResponse(response) {
   if (!response.ok) {
@@ -133,6 +141,32 @@ class APIClient {
     };
     response = await this._fetch(internal ? this.baseUrl + path : path, fetchOptions);
     return response;
+  }
+  /**
+   * Polls an operation for its status until it finishes (success or error)
+   * @param {String} operationId
+   * @param {Number} pollInterval
+   */
+
+
+  async _waitUntilOperationCompletes(operationId, pollInterval) {
+    // Wait a bit before starting
+    await sleep(pollInterval * 0.1); // Start polling
+
+    while (true) {
+      const response = await this._request(`/operations/${operationId}/`);
+      await checkResponse(response);
+      const data = await response.json();
+      const status = data['status'];
+
+      if (status === 'success') {
+        break;
+      } else if (status === 'failed') {
+        throw new APIError(`Operation ${operationId} failed.`);
+      }
+
+      await sleep(pollInterval);
+    }
   }
   /**
      * @async
@@ -321,6 +355,116 @@ class APIClient {
     await checkResponse(response); // Return all went good
 
     return true;
+  }
+  /*
+   * @async
+   * @function createDetector
+   * @summary Creates a detector
+   * @description Creates a detector setting its name and type
+   * @param {String} name Name of the detector
+   * @param {String} type Type of detection; on of "count", "segmentation"
+   * @returns {Promise<String>} Id of the detector that has been created
+   * @throws {APIError} Containing error code and text
+   */
+
+
+  async createDetector(name = '', type = 'count') {
+    const detectionTypes = ['count', 'segmentation'];
+    type = type.toLowerCase();
+
+    if (!detectionTypes.includes(type)) {
+      const validTypes = detectionTypes.join(', ');
+      throw new ValidationError(`Invalid detector type ${type}; allowed values: ${validTypes}.`);
+    }
+
+    const response = await this._request('/detectors/', 'POST', {
+      'content-type': 'application/json'
+    }, JSON.stringify({
+      'name': name,
+      'type': type
+    }));
+    await checkResponse(response);
+    const data = await response.json();
+    return data['id'];
+  }
+  /**
+   * @async
+   * @function addRasterToDetector
+   * @summary Add a raster to the detector training set
+   * @description Add a raster to the detector training set
+   * @param {String} rasterId Id of the raster to add
+   * @param {String} detectorId Id of the detctor involved
+   * @throws {APIError} Containing error code and text
+   */
+
+
+  async addRasterToDetector(rasterId, detectorId) {
+    const response = await this._request(`/detectors/${detectorId}/training_rasters/`, 'POST', {
+      'content-type': 'application/json'
+    }, JSON.stringify({
+      'raster_id': rasterId
+    }));
+    await checkResponse(response);
+  }
+  /**
+   * @async
+   * @function setAnnotations
+   * @summary Overwrites a given annotation type for a raster belonging to a detector training set
+   * @description Creates a detector setting its name and type
+   * @param {String} detectorId If of the detector
+   * @param {String} rasterId Id of the raster
+   * @param {String} annotationType Type of annotation; one of 'outline', 'training_area', 'testing_area', 'validation_area'
+   * @param {Object} annotationsGeoJSon GeoJSON representation of the annotation geometry(ies)"
+   * @throws {APIError} Containing error code and text
+   */
+
+
+  async setAnnotations(detectorId, rasterId, annotationType, annotationsGeoJSon) {
+    let resp, data;
+    const annotationTypes = ['outline', 'training_area', 'testing_area', 'validation_area'];
+    annotationType = annotationType.toLowerCase();
+
+    if (!annotationTypes.includes(annotationType)) {
+      const validTypes = annotationTypes.join(', ');
+      throw new ValidationError(`Invalid annotation type ${annotationType}; allowed values: ${validTypes}.`);
+    } // Get upload URL
+
+
+    resp = await this._request(`/detectors/${detectorId}/training_rasters/${rasterId}/${annotationType}/upload/bulk/`, 'POST');
+    await checkResponse(resp);
+    data = await resp.json();
+    const uploadUrl = data['upload_url'];
+    const uploadId = data['upload_id']; // Put data in remote storage
+
+    resp = await this._request(uploadUrl, 'PUT', {
+      /* 'Content-Length': fileSizeInBytes, */
+      'Content-Type': 'application/json'
+    }, JSON.stringify(annotationsGeoJSon), false);
+    await checkResponse(resp); // Start commit
+
+    resp = await this._request(`/detectors/${detectorId}/training_rasters/${rasterId}/${annotationType}/upload/bulk/${uploadId}/commit/`, 'POST');
+    await checkResponse(resp);
+    data = await resp.json(); // Poll until operation finishes
+
+    await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
+  }
+  /**
+   * @async
+   * @function trainDetector
+   * @summary Trains a detector
+   * @description Launches a training on a detector and waits until it finishes
+   * @param {String} detectorId Identifier for the detector
+   * @throws {APIError} Containing error code and text
+   */
+
+
+  async trainDetector(detectorId) {
+    // Launch training
+    const response = await this._request(`/detectors/${detectorId}/train/`, 'POST');
+    await checkResponse(response);
+    const data = await response.json(); // Poll until training finishes
+
+    await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
   }
   /**
    * @async
