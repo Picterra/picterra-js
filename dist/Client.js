@@ -13,7 +13,8 @@ require("core-js/modules/web.dom.iterable");
  */
 const {
   createReadStream,
-  createWriteStream
+  createWriteStream,
+  statSync
 } = require('fs');
 
 const util = require('util');
@@ -146,15 +147,18 @@ class APIClient {
 
 
   async uploadRaster(fileName, rasterName) {
+    // Compute file size
     const stream = createReadStream(fileName);
-    let response, data;
-    response = await this._request( // Get upload URL
-    '/rasters/upload/file/', 'POST', {
+    const stats = statSync(fileName);
+    const fileSizeInBytes = stats['size'];
+    let response, data; // Get upload URL
+
+    response = await this._request('/rasters/upload/file/', 'POST', {
       'content-type': 'application/json'
     }, JSON.stringify({
-      'name': rasterName // name of the image to upload
-
-    })); // Get parameters for blobstore upload
+      'name': rasterName
+    }) // name of the image to upload
+    ); // Get parameters for blobstore upload
 
     data = await response.json();
     const uploadUrl = data.upload_url; // e.g. "https://storage.picterra.ch?id=AEnB2UmSEvVl"
@@ -162,7 +166,9 @@ class APIClient {
     const rasterId = data.raster_id; // e.g. "123e4567-e89b-12d3-a456-426655440000"
     // Send raster data to blobstore
 
-    response = await this._request(uploadUrl, 'PUT', {}, stream, false);
+    response = await this._request(uploadUrl, 'PUT', {
+      'content-length': fileSizeInBytes
+    }, stream, false);
     await checkResponse(response); // Commit uploaded raster
 
     response = await this._request(`/rasters/${rasterId}/commit/`, 'POST');
