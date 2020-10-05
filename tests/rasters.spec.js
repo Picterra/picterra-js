@@ -45,7 +45,7 @@ describe('/rasters/ endpoints', async () => {
         .get(`/rasters/${RASTER_ID}/`)
         .reply(200, {'status': 'ready'})
         .log(console.log)
-    // ADetection area upload URL, blob upload, commit and poll
+    // Detection area upload URL, blob upload, commit and poll
     scope = nock(TEST_API_URL,  {
         reqheaders: {'X-Api-Key': TEST_API_KEY}})
         .post(`/rasters/${RASTER_ID}/detection_areas/upload/file/`)
