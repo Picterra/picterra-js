@@ -13,8 +13,7 @@ require("core-js/modules/web.dom.iterable");
  */
 const {
   createReadStream,
-  createWriteStream,
-  statSync
+  createWriteStream
 } = require('fs');
 
 const util = require('util');
@@ -183,8 +182,6 @@ class APIClient {
   async uploadRaster(fileName, rasterName) {
     // Compute file size
     const stream = createReadStream(fileName);
-    const stats = statSync(fileName);
-    const fileSizeInBytes = stats['size'];
     let response, data; // Get upload URL
 
     response = await this._request('/rasters/upload/file/', 'POST', {
@@ -200,9 +197,7 @@ class APIClient {
     const rasterId = data.raster_id; // e.g. "123e4567-e89b-12d3-a456-426655440000"
     // Send raster data to blobstore
 
-    response = await this._request(uploadUrl, 'PUT', {
-      'content-length': fileSizeInBytes
-    }, stream, false);
+    response = await this._request(uploadUrl, 'PUT', {}, stream, false);
     await checkResponse(response); // Commit uploaded raster
 
     response = await this._request(`/rasters/${rasterId}/commit/`, 'POST');
@@ -284,7 +279,7 @@ class APIClient {
      * any previous one
      * @param {String} rasterId The Id of the raster whose detection area we want to set
      * @param {String} fileName The GeoJSON with the Detection Areas geometries
-     * @returns {Promise<Boolean>} Whether or not the operation succedeed
+     * @returns {Promise<Boolean>} Whether or not the operation succeeded
      * @throws {APIError} Containing error code and text
      */
 
@@ -356,7 +351,7 @@ class APIClient {
 
     return true;
   }
-  /*
+  /**
    * @async
    * @function createDetector
    * @summary Creates a detector
@@ -427,25 +422,20 @@ class APIClient {
     if (!annotationTypes.includes(annotationType)) {
       const validTypes = annotationTypes.join(', ');
       throw new ValidationError(`Invalid annotation type ${annotationType}; allowed values: ${validTypes}.`);
-    } // Get upload URL
-
+    }
 
     resp = await this._request(`/detectors/${detectorId}/training_rasters/${rasterId}/${annotationType}/upload/bulk/`, 'POST');
     await checkResponse(resp);
     data = await resp.json();
     const uploadUrl = data['upload_url'];
-    const uploadId = data['upload_id']; // Put data in remote storage
-
+    const uploadId = data['upload_id'];
     resp = await this._request(uploadUrl, 'PUT', {
-      /* 'Content-Length': fileSizeInBytes, */
       'Content-Type': 'application/json'
     }, JSON.stringify(annotationsGeoJSon), false);
-    await checkResponse(resp); // Start commit
-
+    await checkResponse(resp);
     resp = await this._request(`/detectors/${detectorId}/training_rasters/${rasterId}/${annotationType}/upload/bulk/${uploadId}/commit/`, 'POST');
     await checkResponse(resp);
-    data = await resp.json(); // Poll until operation finishes
-
+    data = await resp.json();
     await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
   }
   /**
@@ -459,11 +449,9 @@ class APIClient {
 
 
   async trainDetector(detectorId) {
-    // Launch training
     const response = await this._request(`/detectors/${detectorId}/train/`, 'POST');
     await checkResponse(response);
-    const data = await response.json(); // Poll until training finishes
-
+    const data = await response.json();
     await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
   }
   /**

@@ -4,7 +4,7 @@ const APIClient = require('picterra').APIClient;
 
 (async () => {
   // Set the PICTERRA_API_KEY environment variable to define your API key
-  const client = new APIClient('59c4715cee86d854e233739260fdfd8373f13fc393ee66ca389b04bc40e80472', 'https://app-testing.picterra.ch/public/api/v1/')
+  const client = new APIClient()
 
   console.log('Creating detector...')
   const detectorId = await client.createDetector('My first Picterra detector')
