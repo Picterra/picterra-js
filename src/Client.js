@@ -1,6 +1,6 @@
 /**
  * @file Wrapper around the basic functions offered by the Public API
- * @see https://app.picterra.ch/public/apidocs/v1/
+ * @see https://app.picterra.ch/public/apidocs/v2/
  */
 const {createReadStream, createWriteStream} = require('fs')
 const util = require('util')
@@ -71,7 +71,7 @@ export default class APIClient {
     this._timeout = timeoutSeconds * 60 * 1000
     // Setup endpoint
     if (!baseUrl) {
-      baseUrl = process.env.PICTERRA_BASE_URL || 'https://app.picterra.ch/public/api/v1/'
+      baseUrl = process.env.PICTERRA_BASE_URL || 'https://app.picterra.ch/public/api/v2/'
     }
     this.baseUrl = baseUrl
   }
@@ -84,7 +84,7 @@ export default class APIClient {
      * which it stores the API key) but also generic HTTP request, with
      * customizable headers, body and method
      * @param {String} path Relative of absolute URI
-     * @param {Strin} method One of 'GET', 'POST', 'PUT', 'DELETE'
+     * @param {String} method One of 'GET', 'POST', 'PUT', 'DELETE'
      * @param {Object} headers HTTP headers to set as key-value pairs
      * @param {*} body
      * @param {Boolean} internal Whether or not the path URI refers to an endpoint
@@ -195,13 +195,16 @@ export default class APIClient {
      * @throws {APIError} Containing error code and text
      */
   async listRasters () {
-    const response = await this._request('/rasters/')
-    await checkResponse(response)
-    const data = await response.json()
-    if (!Array.isArray(data)) {
-      throw new APIError('Not getting a list as response')
-    }
-    return data
+    let list = []
+    let pageNum = 1
+    do {
+      const response = await this._request(`/rasters/?page_number=${pageNum}`)
+      await checkResponse(response)
+      const data = await response.json()
+      list = list.concat(data['result'])
+      pageNum = data['next'] ? (pageNum + 1) : 0
+    } while (pageNum > 0)
+    return list
   }
   /**
      * @async
@@ -476,7 +479,6 @@ export default class APIClient {
     if (!data.ready) {
       throw new APIError('Result not ready')
     }
-
     response = await this._request(data.result_url, 'GET', {}, null, false)
     await checkResponse(response)
     return streamPipeline(response.body, createWriteStream(fileName))
