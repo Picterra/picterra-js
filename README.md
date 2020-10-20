@@ -10,3 +10,9 @@
 
 
 **Please note that currently this library works only on Node, not yet portable to browser.**
+
+## Installation
+
+```
+npm install github:picterra/picterra-js
+```
