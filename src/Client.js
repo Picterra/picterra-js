@@ -201,7 +201,7 @@ export default class APIClient {
       const response = await this._request(`/rasters/?page_number=${pageNum}`)
       await checkResponse(response)
       const data = await response.json()
-      list = list.concat(data['result'])
+      list = list.concat(data['results'])
       pageNum = data['next'] ? (pageNum + 1) : 0
     } while (pageNum > 0)
     return list
