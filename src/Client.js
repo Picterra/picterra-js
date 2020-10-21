@@ -50,7 +50,7 @@ export default class APIClient {
     // Setup API key
     if (!apiKey) {
       if (!process.env.PICTERRA_API_KEY) {
-        throw APIError(
+        throw new APIError(
           'apiKey is undefined and PICTERRA_API_KEY environment variable is not defined'
         )
       } else {
