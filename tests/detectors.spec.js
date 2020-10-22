@@ -13,13 +13,40 @@ const TEST_STORAGE_URL = 'http://storage.example.com'
 const DETECTOR_ID = 'ce2eb567-d304-411d-b430-5d76a0d597ac'
 const RASTER_ID = '123e4567-e89b-12d3-a456-426655440000'
 const RESULT_ID = 'a4b2e2d0-c263-4763-999f-89c027e155a2'
-// Comple object mockS
-const mockDetectorsList = [{id: DETECTOR_ID, name: 'a'}, {id: '2', name: 'b'}]
+// Complex object mocks
+const mockDetectorsList1 = [
+  {id: 'a', name: 'a', detection_type: 'count', output_type: 'polygon', training_steps: 1000},
+  {id: 'b', name: 'b', detection_type: 'segmentation', output_type: 'bbox', training_steps: 2000}
+]
+const mockDetectorsList2 = [
+  {id: 'c', name: 'c', detection_type: 'count', output_type: 'polygon', training_steps: 1000},
+  {id: 'd', name: 'd', detection_type: 'segmentation', output_type: 'bbox', training_steps: 2000}
+]
+const mockDetectorsList = [
+  {
+    'count': 4,
+    'next': `${TEST_API_URL}/detectors/?page_number=2`,
+    'previous': null,
+    'results': mockDetectorsList1,
+    'page_size': 2
+  },
+  {
+    'count': 4,
+    'next': null,
+    'previous': `${TEST_API_URL}/detectors/?page_number=1`,
+    'results': mockDetectorsList2,
+    'page_size': 2
+  }
+]
 
 describe('/detectors/ endpoint', async () => {
   // Prepare mock HTTP responses
   let scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
-    .get('/detectors/')
+    .get('/detectors/?page_number=1')
+    .reply(200, mockDetectorsList)
+    .log(console.log)
+  scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
+    .get('/detectors/?page_number=2')
     .reply(200, mockDetectorsList)
     .log(console.log)
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})

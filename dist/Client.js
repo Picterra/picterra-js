@@ -469,15 +469,18 @@ class APIClient {
 
 
   async listDetectors() {
-    const response = await this._request('/detectors/');
-    await checkResponse(response);
-    const data = await response.json();
+    let list = [];
+    let pageNum = 1;
 
-    if (!Array.isArray(data)) {
-      throw new APIError('Not getting a list as response');
-    }
+    do {
+      const response = await this._request(`/detectors/?page_number=${pageNum}`);
+      await checkResponse(response);
+      const data = await response.json();
+      list = list.concat(data['results']);
+      pageNum = data['next'] ? pageNum + 1 : 0;
+    } while (pageNum > 0);
 
-    return data;
+    return list;
   }
   /**
      * @async
