@@ -360,15 +360,15 @@ class APIClient {
    * @summary Creates a detector
    * @description Creates a detector setting its name and type
    * @param {String} name Name of the detector
-   * @param {String} type Type of detection; on of "count", "segmentation"
+   * @param {String} detection_type Type of detection; on of "count", "segmentation"
    * @returns {Promise<String>} Id of the detector that has been created
    * @throws {APIError} Containing error code and text
    */
 
 
-  async createDetector(name = '', type = 'count') {
+  async createDetector(name = '', detection_type = 'count') {
     const detectionTypes = ['count', 'segmentation'];
-    type = type.toLowerCase();
+    const type = detection_type.toLowerCase();
 
     if (!detectionTypes.includes(type)) {
       const validTypes = detectionTypes.join(', ');
@@ -379,7 +379,7 @@ class APIClient {
       'content-type': 'application/json'
     }, JSON.stringify({
       'name': name,
-      'type': type
+      'detection_type': type
     }));
     await checkResponse(response);
     const data = await response.json();
