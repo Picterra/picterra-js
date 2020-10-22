@@ -24,7 +24,11 @@ describe('/detectors/ endpoint', async () => {
     .log(console.log)
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
     .get(`/detectors/${DETECTOR_ID}/`)
-    .reply(200, mockDetectorsList.find( d => d.id === DETECTOR_ID))
+    .reply(200, mockDetectorsList1[0])
+    .log(console.log)
+  scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
+    .post('/detectors/', {name: 'spam', detection_type: 'segmentation'})
+    .reply(201, {id: 'spam'})
     .log(console.log)
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
     .post(`/detectors/${DETECTOR_ID}/run/`, {raster_id: RASTER_ID})
@@ -51,6 +55,10 @@ describe('/detectors/ endpoint', async () => {
   })
   it('Should get one detector', async () => {
     const res = await this.mockClient.getDetectorById(DETECTOR_ID)
+    assert.ok(res)
+  })
+  it('Should create one detector', async () => {
+    const res = await this.mockClient.createDetector('spam', 'segmentation')
     assert.ok(res)
   })
   it('Should run one detector', async () => {
