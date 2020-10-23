@@ -137,21 +137,29 @@ export default class APIClient {
      * @function uploadRaster
      * @summary Uploads a local file as a new raster on Picterra
      * @param {Number} fileName name of the local file to upload
-     * @param {String} rasterName Name
+     * @param {String} rasterName Name of the uploaded raster
+     * @param {String} folderId Id of the folder/project the raster will be uploaded to
      * @returns {Promise} A promise that resolves to the rasterId (String)
      *   once the raster is ready on Picterra
      * @throws {APIError} Containing error code and text
      */
-  async uploadRaster (fileName, rasterName) {
+  async uploadRaster (fileName, rasterName = '', folderId = '') {
     // Compute file size
     const stream = createReadStream(fileName)
     let response, data
+    const body = {}
+    if (rasterName !== '') {
+      body['name'] = rasterName
+    }
+    if (folderId !== '') {
+      body['folder_id'] = folderId
+    }
     // Get upload URL
     response = await this._request(
       '/rasters/upload/file/',
       'POST',
       {'content-type': 'application/json'},
-      JSON.stringify({'name': rasterName}) // name of the image to upload
+      JSON.stringify(body)
     )
     // Get parameters for blobstore upload
     data = await response.json()
