@@ -12,6 +12,7 @@ const TEST_POLL_INTERVAL = 0.1
 const TEST_STORAGE_URL = 'http://storage.example.com'
 const RASTER_ID = '123e4567-e89b-12d3-a456-426655440000'
 const UPLOAD_ID = '7fa216e4-12ea-4bc3-bc58-0cc72c0187c9'
+const FOLDER_ID = 'fff1f673-f1eb-4a92-83a5-7fba55e66a5c'
 const RASTER_NAME = 'example_raster.tif'
 const FILEPATH = 'examples/data/detection_area1.geojson'
 
@@ -36,7 +37,7 @@ const mockRasterList = [
 describe('/rasters/ endpoints', async () => {
   // Raster upload
   let scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
-    .post('/rasters/upload/file/', {name: RASTER_NAME})
+    .post('/rasters/upload/file/', {name: RASTER_NAME, folder_id: FOLDER_ID})
     .reply(201, {
       'raster_id': RASTER_ID,
       'upload_url': TEST_STORAGE_URL
@@ -103,7 +104,7 @@ describe('/rasters/ endpoints', async () => {
   it('Should upload a raster', async () => {
     // Create fake image file
     this.tmp = tmp.fileSync()
-    const res = await this.mockClient.uploadRaster(this.tmp.name, RASTER_NAME)
+    const res = await this.mockClient.uploadRaster(this.tmp.name, RASTER_NAME, FOLDER_ID)
     assert.ok(res)
   })
   it('Should get the list of rasters', async () => {
