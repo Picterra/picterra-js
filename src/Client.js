@@ -305,16 +305,28 @@ export default class APIClient {
    * @summary Creates a detector
    * @description Creates a detector setting its name and type
    * @param {String} name Name of the detector
-   * @param {String} detection_type Type of detection; on of "count", "segmentation"
+   * @param {String} detectionType Type of detection; one of "count", "segmentation"
+   * @param {String} outputType Type of results output; one of "bbox", "polygon"
+   * @param {String} trainingSteps Number of training steps, between 500 and 40000
    * @returns {Promise<String>} Id of the detector that has been created
    * @throws {APIError} Containing error code and text
    */
-  async createDetector (name = '', detection_type = 'count') {
+  async createDetector (name = '', detectionType = 'count', outputType = 'polygon', trainingSteps = 500) {
+    detectionType = detectionType.toLowerCase()
+    outputType = outputType.toLowerCase()
     const detectionTypes = ['count', 'segmentation']
-    const type = detection_type.toLowerCase()
-    if (!detectionTypes.includes(type)) {
+    if (!detectionTypes.includes(detectionType)) {
       const validTypes = detectionTypes.join(', ')
-      throw new ValidationError(`Invalid detector type ${type}; allowed values: ${validTypes}.`)
+      throw new ValidationError(`Invalid detector type ${detectionType}; allowed values: ${validTypes}.`)
+    }
+    const outputTypes = ['polygon', 'bbox']
+    if (!outputTypes.includes(outputType)) {
+      const validTypes = outputTypes.join(', ')
+      throw new ValidationError(`Invalid output type ${outputType}; allowed values: ${validTypes}.`)
+    }
+    const range = [500, 40 * 1000]
+    if ((trainingSteps < range[0]) || (trainingSteps > range[1])) {
+      throw new ValidationError(`Training steps value ${trainingSteps} is outside range [${range[0]}, ${range[1]}].`)
     }
     const response = await this._request(
       '/detectors/',
@@ -322,12 +334,71 @@ export default class APIClient {
       {'content-type': 'application/json'},
       JSON.stringify({
         'name': name,
-        'detection_type': type
+        'configuration': {
+          'detection_type': detectionType,
+          'output_type': outputType,
+          'training_steps': trainingSteps
+        }
       })
     )
     await checkResponse(response)
     const data = await response.json()
     return data['id']
+  }
+  /**
+   * @async
+   * @function editDetector
+   * @summary Edit a detector's metadata
+   * @description Edit a detector settings and/or its name
+   * @param {String} detectorId Identifier for the detector
+   * @param {String} name Name of the detector
+   * @param {String} detectionType Type of detection; oen of "count", "segmentation"
+   * @param {String} outputType Type of results output; one of "bbox", "polygon"
+   * @param {String} trainingSteps Number of training steps, between 500 and 40000
+   * @throws {APIError} Containing error code and text
+   */
+  async editDetector (detectorId, name, detectionType, outputType, trainingSteps) {
+    const bodyData = {}
+    if (name) {
+      bodyData.name = name
+      bodyData.configuration = {}
+    }
+    if (detectionType) {
+      detectionType = detectionType.toLowerCase()
+      const detectionTypes = ['count', 'segmentation']
+      if (!detectionTypes.includes(detectionType)) {
+        const validTypes = detectionTypes.join(', ')
+        throw new ValidationError(`Invalid detector type ${detectionType}; allowed values: ${validTypes}.`)
+      } else {
+        bodyData.configuration.detection_type = detectionType
+      }
+    }
+    if (outputType) {
+      outputType = outputType.toLowerCase()
+      const outputTypes = ['polygon', 'bbox']
+      if (!outputTypes.includes(outputType)) {
+        const validTypes = outputTypes.join(', ')
+        throw new ValidationError(`Invalid output type ${outputType}; allowed values: ${validTypes}.`)
+      } else {
+        bodyData.configuration.output_type = outputType
+      }
+    }
+    if (trainingSteps) {
+      const range = [500, 40 * 1000]
+      if ((trainingSteps < range[0]) || (trainingSteps > range[1])) {
+        throw new ValidationError(`Training steps value ${trainingSteps} is outside range [${range[0]}, ${range[1]}].`)
+      } else {
+        bodyData.configuration.training_steps = trainingSteps
+      }
+    }
+    const response = await this._request(
+      `/detectors/${detectorId}/`,
+      'PUT',
+      {'content-type': 'application/json'},
+      JSON.stringify(bodyData)
+    )
+    await checkResponse(response)
+    return true
   }
   /**
    * @async
@@ -346,6 +417,7 @@ export default class APIClient {
       JSON.stringify({'raster_id': rasterId})
     )
     await checkResponse(response)
+    return true
   }
   /**
    * @async
@@ -383,6 +455,7 @@ export default class APIClient {
     await checkResponse(resp)
     data = await resp.json()
     await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval'])
+    return true
   }
   /**
    * @async
@@ -397,6 +470,7 @@ export default class APIClient {
     await checkResponse(response)
     const data = await response.json()
     await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval'])
+    return true
   }
   /**
    * @async

@@ -124,3 +124,10 @@ describe('/rasters/ endpoints', async () => {
     assert.ok(res)
   })
 })
+
+
+process.on("unhandledRejection", (reason) => {
+	console.log("unhandled rejection:", reason);
+	unhandledRejectionExitCode = 1;
+	throw reason;
+});

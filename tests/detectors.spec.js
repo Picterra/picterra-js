@@ -1,7 +1,6 @@
 // Imports
 const nock = require('nock') // // https://github.com/nock/nock
 const assert = require('assert').strict // https://nodejs.org/api/assert.html
-const tmp = require('tmp')
 
 const APIClient = require('../dist/index.js').APIClient
 
@@ -15,12 +14,12 @@ const RASTER_ID = '123e4567-e89b-12d3-a456-426655440000'
 const RESULT_ID = 'a4b2e2d0-c263-4763-999f-89c027e155a2'
 // Complex object mocks
 const mockDetectorsList1 = [
-  {id: 'a', name: 'a', detection_type: 'count', output_type: 'polygon', training_steps: 1000},
-  {id: 'b', name: 'b', detection_type: 'segmentation', output_type: 'bbox', training_steps: 2000}
+  {id: 'a', name: 'a', configuration: {detection_type: 'count', output_type: 'polygon', training_steps: 1000}},
+  {id: 'b', name: 'b', configuration: {detection_type: 'segmentation', output_type: 'bbox', training_steps: 2000}}
 ]
 const mockDetectorsList2 = [
-  {id: 'c', name: 'c', detection_type: 'count', output_type: 'polygon', training_steps: 1000},
-  {id: 'd', name: 'd', detection_type: 'segmentation', output_type: 'bbox', training_steps: 2000}
+  {id: 'c', name: 'c', configuration: {detection_type: 'count', output_type: 'polygon', training_steps: 1000}},
+  {id: 'd', name: 'd', configuration: {detection_type: 'segmentation', output_type: 'bbox', training_steps: 2000}}
 ]
 const mockDetectorsList = [
   {
@@ -40,7 +39,7 @@ const mockDetectorsList = [
 ]
 
 describe('/detectors/ endpoint', async () => {
-  // Prepare mock HTTP responses
+  // listDetectors
   let scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
     .get('/detectors/?page_number=1')
     .reply(200, mockDetectorsList)
@@ -49,14 +48,22 @@ describe('/detectors/ endpoint', async () => {
     .get('/detectors/?page_number=2')
     .reply(200, mockDetectorsList)
     .log(console.log)
+  // getDetectorById
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
     .get(`/detectors/${DETECTOR_ID}/`)
     .reply(200, mockDetectorsList1[0])
     .log(console.log)
+  // createDetector
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
-    .post('/detectors/', {name: 'spam', detection_type: 'segmentation'})
-    .reply(201, {id: 'spam'})
+    .post('/detectors/', {name: 'spam', configuration: {detection_type: 'segmentation', output_type: 'polygon', training_steps: 500}})
+    .reply(201, {id: DETECTOR_ID})
     .log(console.log)
+  // editDetector
+  scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
+    .put(`/detectors/${DETECTOR_ID}/`, {name: 'spam', configuration: {output_type: 'bbox'}})
+    .reply(204)
+    .log(console.log)
+  // runDetector
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
     .post(`/detectors/${DETECTOR_ID}/run/`, {raster_id: RASTER_ID})
     .reply(201, {result_id: RESULT_ID, poll_interval: TEST_POLL_INTERVAL})
@@ -88,8 +95,36 @@ describe('/detectors/ endpoint', async () => {
     const res = await this.mockClient.createDetector('spam', 'segmentation')
     assert.ok(res)
   })
+  it('Should edit one detector', async () => {
+    const res = await this.mockClient.editDetector(DETECTOR_ID, 'spam', null, 'bbox')
+    assert.ok(res)
+  })
+  it('Should raise errors while creating a detector if settings are wrong', async () => {
+    [
+      ['', 'spam', null, 2000], // detection
+      ['', null, 'spam', 2000], // output
+      ['', null, undefined, 10 ** 9], // steps 1
+      ['', null, null, null, 0] // steps 2
+
+    ].forEach(o => assert.rejects(async () => this.mockClient.createDetector(...o)))
+  })
+  it('Should raise errors while editing a detector if settings are wrong', async () => {
+    [
+      ['', 'segmentation', null, 2000], // detection
+      ['', null, 'spam', 2000], // output
+      ['', null, undefined, 10 ** 9], // steps 1
+      ['', null, null, null, 0] // steps 2
+
+    ].forEach(o => assert.rejects(async () => this.mockClient.editDetector('spamId', ...o)))
+  })
   it('Should run one detector', async () => {
     const res = await this.mockClient.runDetector(DETECTOR_ID, RASTER_ID)
     assert.ok(res)
   })
 })
+
+process.on("unhandledRejection", (reason) => {
+	console.log("unhandled rejection:", reason);
+	unhandledRejectionExitCode = 1;
+	throw reason;
+});
