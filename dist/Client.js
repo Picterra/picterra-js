@@ -212,31 +212,7 @@ class APIClient {
     await checkResponse(response);
     data = await response.json(); // Prepare for polling
 
-    const pollInterval = data.poll_interval; // In seconds
-
-    const timeout = Date.now() + this._timeout;
-
-    let isReady = false; // Start polling to check raster commit status
-
-    do {
-      await sleep(pollInterval);
-      response = await this._request(`/rasters/${rasterId}/`);
-
-      if (Date.now() > timeout || !response.ok) {
-        break;
-      }
-
-      data = await response.json();
-      isReady = data.status === 'ready';
-    } while (!isReady); // Poll until complete
-    // Raise error in case of timeout or bad response
-
-
-    if (!isReady) {
-      const errorMessage = response.ok ? 'Request timed-out' : 'Error uploading raster';
-      throw new APIError(errorMessage);
-    }
-
+    await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
     return rasterId;
   }
   /**
@@ -312,37 +288,8 @@ class APIClient {
     await checkResponse(response); // Prepare for polling
 
     data = await response.json();
-    const pollInterval = data.poll_interval; // In seconds
-
-    const timeout = Date.now() + this._timeout;
-
-    let isReady = false; // Start polling to check upload commit status
-
-    do {
-      await sleep(pollInterval);
-      response = await this._request(`/rasters/${rasterId}/detection_areas/upload/${uploadId}/`);
-
-      if (Date.now() > timeout || !response.ok) {
-        break;
-      }
-
-      data = await response.json();
-
-      if (data.status === 'failed') {
-        break;
-      }
-
-      isReady = data.status === 'ready';
-    } while (!isReady); // Poll until complete
-    // Error management
-
-
-    if (!isReady) {
-      const text = await response.text();
-      throw new APIError('Error uploading detection area', text);
-    } else {
-      return true;
-    }
+    await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
+    return true;
   }
   /**
     * @summary Delete a raster, identified by an UUID
@@ -609,7 +556,7 @@ class APIClient {
 
 
   async runDetector(detectorId, rasterId) {
-    let response, data, isReady;
+    let response, data;
     response = await this._request(`/detectors/${detectorId}/run/`, 'POST', {
       'content-type': 'application/json'
     }, JSON.stringify({
@@ -617,45 +564,20 @@ class APIClient {
     }));
     await checkResponse(response);
     data = await response.json();
-    const pollInterval = data.poll_interval;
-
-    const timeout = Date.now() + this._timeout;
-
-    const resultId = data.result_id;
-    isReady = false; // Start polling to check detection status
-
-    do {
-      await sleep(pollInterval);
-      response = await this._request(`/results/${resultId}/`);
-
-      if (Date.now() > timeout || !response.ok) {
-        break;
-      }
-
-      data = await response.json();
-      isReady = data.ready;
-    } while (!isReady); // Poll until complete
-    // Raise error in case of timeout or bad response
-
-
-    if (!isReady) {
-      const errorMessage = response.ok ? 'Request timed-out' : 'Error detecting on raster';
-      throw new APIError(errorMessage);
-    }
-
-    return resultId;
+    await this._waitUntilOperationCompletes(data['operation_id'], data['poll_interval']);
+    return data['operation_id'];
   }
 
-  async downloadResultToFile(resultId, fileName) {
-    let response = await this._request(`/results/${resultId}/`);
+  async downloadResultToFile(operationId, fileName) {
+    let response = await this._request(`/operations/${operationId}/`);
     await checkResponse(response);
     const data = await response.json();
 
-    if (!data.ready) {
-      throw new APIError('Result not ready');
+    if (data.status !== 'success') {
+      throw new APIError('Operation not finished');
     }
 
-    response = await this._request(data.result_url, 'GET', {}, null, false);
+    response = await this._request(data.results.url, 'GET', {}, null, false);
     await checkResponse(response);
     return streamPipeline(response.body, createWriteStream(fileName));
   }
