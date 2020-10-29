@@ -11,7 +11,7 @@ const TEST_POLL_INTERVAL = 0.1
 const TEST_STORAGE_URL = 'http://storage.example.com'
 const DETECTOR_ID = 'ce2eb567-d304-411d-b430-5d76a0d597ac'
 const RASTER_ID = '123e4567-e89b-12d3-a456-426655440000'
-const RESULT_ID = 'a4b2e2d0-c263-4763-999f-89c027e155a2'
+const OPERATION_ID = 'a4b2e2d0-c263-4763-999f-89c027e155a2'
 // Complex object mocks
 const mockDetectorsList1 = [
   {id: 'a', name: 'a', configuration: {detection_type: 'count', output_type: 'polygon', training_steps: 1000}},
@@ -66,17 +66,17 @@ describe('/detectors/ endpoint', async () => {
   // runDetector
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
     .post(`/detectors/${DETECTOR_ID}/run/`, {raster_id: RASTER_ID})
-    .reply(201, {result_id: RESULT_ID, poll_interval: TEST_POLL_INTERVAL})
+    .reply(201, {operation_id: OPERATION_ID, poll_interval: TEST_POLL_INTERVAL})
     .log(console.log)
   scope = nock(TEST_API_URL, {reqheaders: {'X-Api-Key': TEST_API_KEY}})
-    .get(`/results/${RESULT_ID}/`)
+    .get(`/operations/${OPERATION_ID}/`)
     .times(4)
-    .reply(200, {ready: false})
-    .get(`/results/${RESULT_ID}/`)
-    .reply(200, {ready: true, result_url: TEST_STORAGE_URL})
+    .reply(200, {status: 'running'})
+    .get(`/operations/${OPERATION_ID}/`)
+    .reply(200, {status: 'success', results: {url: TEST_STORAGE_URL}})
     .log(console.log)
   scope.defaultReplyHeaders({
-    'content-type': 'application/json',
+    'content-type': 'application/json'
   })
   beforeEach(() => {
     // Create API client
