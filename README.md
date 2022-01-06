@@ -1,3 +1,5 @@
+**This repository is archived**, see our [Python client library](https://github.com/Picterra/picterra-python) instead.
+
 <a href="https://picterra.ch">
     <img
         src="https://storage.googleapis.com/cloud.picterra.ch/public/assets/logo/picterra_logo_640.png"
